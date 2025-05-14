@@ -100,6 +100,30 @@ extension DependencyTests {
         XCTAssertNotNil(widgetModule)
         XCTAssertNotNil(added)
     }
+
+    func testRegisteringDependenciesTwice() {
+        class Added { }
+
+        let first = Added()
+        let second = Added()
+
+        let newResolver = DependencyResolver({
+            Module(scope: .singleton) { first as Added }
+        })
+        newResolver.build()
+
+        @Inject var added: Added
+        XCTAssertTrue(added === first)
+
+        let newResolver2 = DependencyResolver({
+            Module(scope: .singleton) { second as Added }
+        })
+        newResolver2.build()
+
+        @Inject var added2: Added
+
+        XCTAssertTrue(added2 === second)
+    }
 }
 
 // MARK: - Subtypes
