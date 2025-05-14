@@ -49,6 +49,8 @@ private extension DependencyResolver {
     /// Registers a specific type and its instantiating factory.
     func add(module: Module) {
         self.modules[module.name] = module
+        // When we register a new module, if there is an instance with the same name we remove it
+        self.instances[module.name] = nil
     }
 
     /// Resolves through inference and returns an instance of the given type from the current default container.
