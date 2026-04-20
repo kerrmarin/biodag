@@ -1,5 +1,10 @@
 # Unreleased
 
+- Update Swift version to 6.0
+- Add strict concurrency checking with Sendable conformance
+- Implement thread-safe access to DependencyResolver with NSLock
+- Add thread-safe memoization cache
+
 # 0.4.0
 - Update Swift version to 5.10
 - Allow multiple modules to be registered at different times

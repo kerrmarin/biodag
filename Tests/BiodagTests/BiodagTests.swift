@@ -84,8 +84,8 @@ extension DependencyTests {
     }
 
     func testAddingDependencies() {
-        struct Added { }
-        struct NotAdded { }
+        struct Added: Sendable { }
+        struct NotAdded: Sendable { }
 
         let newResolver = DependencyResolver({
             Module { Added() as Added }
@@ -102,7 +102,7 @@ extension DependencyTests {
     }
 
     func testRegisteringDependenciesTwice() {
-        class Added { }
+        final class Added: Sendable { }
 
         let first = Added()
         let second = Added()
