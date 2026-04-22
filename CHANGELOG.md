@@ -1,9 +1,12 @@
 # Unreleased
 
-- Update Swift version to 6.0
-- Add strict concurrency checking with Sendable conformance
+# 0.5.0
+- Update swift-tools-version to 6.2
+- Maintain Swift 6.0 language mode with strict concurrency checking
+- Add Sendable conformance to DependencyResolver, Module, Inject, and InjectionScope
 - Implement thread-safe access to DependencyResolver with NSLock
-- Add thread-safe memoization cache
+- Add thread-safe memoization cache with MemoizeCache
+- Mark closure types as @Sendable to satisfy concurrency requirements
 
 # 0.4.0
 - Update Swift version to 5.10

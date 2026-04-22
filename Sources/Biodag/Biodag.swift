@@ -58,7 +58,9 @@ private extension DependencyResolver {
             self.instances[module.name] = nil
         }
     }
+}
 
+public extension DependencyResolver {
     /// Resolves through inference and returns an instance of the given type from the current default container.
     ///
     /// If the dependency is not found, an exception will occur.

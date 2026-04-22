@@ -25,7 +25,7 @@ final class MemoizeCache<Key: Hashable, Value>: @unchecked Sendable {
 // All reads and writes are protected by the lock, ensuring thread-safe access.
 
 // Adapted from https://medium.com/@mvxlr/swift-memoize-walk-through-c5224a558194
-func memoize<T: Hashable & Sendable, U>(_ closure: @escaping @Sendable (T) -> U) -> @Sendable (T) -> U {
+public func memoize<T: Hashable & Sendable, U>(_ closure: @escaping @Sendable (T) -> U) -> @Sendable (T) -> U {
     let cache = MemoizeCache<T, U>()
     return { @Sendable (val: T) -> U in
         cache.value(for: val, compute: closure)

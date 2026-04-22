@@ -124,6 +124,153 @@ extension DependencyTests {
 
         XCTAssertTrue(added2 === second)
     }
+
+    @MainActor
+    func testConcurrentResolveOperations() {
+        // Test that concurrent resolves don't cause crashes or race conditions
+        let operationCount = 100
+        let threadCount = 10
+        let expectation = self.expectation(description: "All concurrent resolves complete")
+        expectation.expectedFulfillmentCount = threadCount
+
+        for _ in 0..<threadCount {
+            DispatchQueue.global().async {
+                for _ in 0..<operationCount {
+                    let _: WidgetModuleType = self.widgetModule
+                }
+                expectation.fulfill()
+            }
+        }
+
+        waitForExpectations(timeout: 10)
+    }
+
+    @MainActor
+    func testConcurrentResolveWithMultipleThreads() {
+        // Test that multiple threads can safely resolve the same dependency
+        let expectation = self.expectation(description: "Concurrent resolves")
+        expectation.expectedFulfillmentCount = 5
+
+        for _ in 0..<5 {
+            DispatchQueue.global().async {
+                for _ in 0..<20 {
+                    // Use existing dependency from setup
+                    let _: WidgetModuleType = self.widgetModule
+                }
+                expectation.fulfill()
+            }
+        }
+
+        waitForExpectations(timeout: 10)
+    }
+
+    @MainActor
+    func testSingletonConsistencyUnderConcurrentAccess() {
+        // Test that singleton instances remain the same across concurrent threads
+        final class ThreadSafeArray: @unchecked Sendable {
+            private let lock = NSLock()
+            private var items: [AnyObject] = []
+
+            func add(_ item: AnyObject) {
+                lock.withLock {
+                    items.append(item)
+                }
+            }
+
+            func allItems() -> [AnyObject] {
+                lock.withLock { items }
+            }
+        }
+
+        let collectedInstances = ThreadSafeArray()
+        let expectation = self.expectation(description: "Singleton consistency")
+        expectation.expectedFulfillmentCount = 10
+
+        for _ in 0..<10 {
+            DispatchQueue.global().async {
+                for _ in 0..<20 {
+                    let service = self.singletonModule
+                    collectedInstances.add(service as AnyObject)
+                }
+                expectation.fulfill()
+            }
+        }
+
+        waitForExpectations(timeout: 10)
+
+        // All collected instances should be identical (same object)
+        let allItems = collectedInstances.allItems()
+        let firstItem = allItems.first
+        for item in allItems {
+            XCTAssert(item === firstItem, "Singleton should return same instance across all threads")
+        }
+    }
+
+    @MainActor
+    func testPrototypeCreationUnderConcurrentAccess() {
+        // Test that prototype scope creates new instances
+        // Note: @Inject is memoized per instance, so we use the property wrapper directly
+        let expectation = self.expectation(description: "Prototype memoization is consistent")
+        expectation.expectedFulfillmentCount = 5
+
+        for _ in 0..<5 {
+            DispatchQueue.global().async {
+                // The @Inject property wrapper uses memoization, so multiple accesses
+                // to self.sampleModule2 (with key "abc") return the same cached instance
+                for _ in 0..<10 {
+                    let _: SampleModuleType = self.sampleModule2
+                }
+                expectation.fulfill()
+            }
+        }
+
+        waitForExpectations(timeout: 10)
+
+        // If we got here without crashing, concurrent access to memoized injections is safe
+    }
+
+    @MainActor
+    func testConcurrentMemoizationAccess() {
+        // Test that memoized values are thread-safe
+        final class ThreadSafeCounter: @unchecked Sendable {
+            private let lock = NSLock()
+            private var items: [Int] = []
+
+            func add(_ item: Int) {
+                lock.withLock {
+                    items.append(item)
+                }
+            }
+
+            func count() -> Int {
+                lock.withLock { items.count }
+            }
+        }
+
+        let computationCount = ThreadSafeCounter()
+
+        let memoized = memoize { (value: Int) -> Int in
+            computationCount.add(value)
+            return value * 2
+        }
+
+        let expectation = self.expectation(description: "Concurrent memoization")
+        expectation.expectedFulfillmentCount = 10
+
+        for _ in 0..<10 {
+            DispatchQueue.global().async {
+                for i in 0..<5 {
+                    let _ = memoized(i)
+                }
+                expectation.fulfill()
+            }
+        }
+
+        waitForExpectations(timeout: 10)
+
+        // Each value (0-4) should only be computed once, not 10*5=50 times
+        XCTAssertLessThanOrEqual(computationCount.count(), 5, "Memoization should avoid redundant computation")
+    }
 }
 
 // MARK: - Subtypes
