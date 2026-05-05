@@ -80,7 +80,7 @@ public extension DependencyResolver {
             let component: T = {
                 // Create a closure to lazily evaluate the resolution of the module
                 let resolvedModuleClosure: () -> T = {
-                    guard let mod = module.resolve() as? T else {
+                    guard let mod = module.resolveValue() as? T else {
                         fatalError("Dependency '\(T.self)' not resolved!")
                     }
                     return mod
@@ -102,6 +102,14 @@ public extension DependencyResolver {
             return component
         }
     }
+
+    /// Resolves using the shared composition root (same behavior as ``Inject``).
+    ///
+    /// Use this when you need concurrent or non-instance resolution without capturing ``Inject``'s
+    /// property-wrapper storage (e.g. tests or advanced wiring).
+    static func resolveFromSharedRoot<T>(for name: String? = nil) -> T {
+        Self.root.resolve(for: name)
+    }
 }
 
 // MARK: Public API
@@ -115,24 +123,44 @@ public extension DependencyResolver {
     }
 }
 
+// SAFETY: Holds a non-Sendable factory so `Module` can capture @MainActor / non-Sendable values (e.g. UI adapters).
+// The factory runs only while `DependencyResolver`'s lock is held during `resolve` / registration paths; see THREAD_SAFETY.md.
+private final class ModuleFactoryBox: @unchecked Sendable {
+    private let run: () -> Any
+
+    init<T>(_ factory: @escaping () -> T) {
+        self.run = { factory() as Any }
+    }
+
+    func resolve() -> Any {
+        self.run()
+    }
+}
+
 /// A type that contributes to the object graph.
 public struct Module: Sendable {
     fileprivate let name: String
-    fileprivate let resolve: @Sendable () -> Any
+    fileprivate let factory: ModuleFactoryBox
     fileprivate let scope: InjectionScope
 
-    public init<T>(_ name: String? = nil, scope: InjectionScope = .prototype, _ resolve: @escaping @Sendable () -> T) {
+    /// - Parameter resolve: Factory for this dependency. May capture non-Sendable or main-actor state; callers must ensure
+    ///   it is safe to run from threads that invoke `DependencyResolver.resolve` or `Inject.wrappedValue` (see THREAD_SAFETY.md).
+    public init<T>(_ name: String? = nil, scope: InjectionScope = .prototype, _ resolve: @escaping () -> T) {
         self.name = name ?? String(describing: T.self)
-        self.resolve = resolve
+        self.factory = ModuleFactoryBox(resolve)
         self.scope = scope
+    }
+
+    fileprivate func resolveValue() -> Any {
+        self.factory.resolve()
     }
 }
 
 /// Resolves an instance from the dependency injection container.
 @propertyWrapper
-public struct Inject<Value>: Sendable {
+public struct Inject<Value>: @unchecked Sendable {
     private let name: String?
-    private let resolutionClosure: @Sendable (String?) -> Value
+    private let resolutionClosure: (String?) -> Value
 
     public var wrappedValue: Value {
         return self.resolutionClosure(self.name)

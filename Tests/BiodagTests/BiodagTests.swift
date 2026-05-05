@@ -136,7 +136,7 @@ extension DependencyTests {
         for _ in 0..<threadCount {
             DispatchQueue.global().async {
                 for _ in 0..<operationCount {
-                    let _: WidgetModuleType = self.widgetModule
+                    let _: WidgetModuleType = DependencyResolver.resolveFromSharedRoot()
                 }
                 expectation.fulfill()
             }
@@ -154,8 +154,7 @@ extension DependencyTests {
         for _ in 0..<5 {
             DispatchQueue.global().async {
                 for _ in 0..<20 {
-                    // Use existing dependency from setup
-                    let _: WidgetModuleType = self.widgetModule
+                    let _: WidgetModuleType = DependencyResolver.resolveFromSharedRoot()
                 }
                 expectation.fulfill()
             }
@@ -189,7 +188,7 @@ extension DependencyTests {
         for _ in 0..<10 {
             DispatchQueue.global().async {
                 for _ in 0..<20 {
-                    let service = self.singletonModule
+                    let service: SampleModuleType = DependencyResolver.resolveFromSharedRoot(for: "singleton")
                     collectedInstances.add(service as AnyObject)
                 }
                 expectation.fulfill()
@@ -215,10 +214,8 @@ extension DependencyTests {
 
         for _ in 0..<5 {
             DispatchQueue.global().async {
-                // The @Inject property wrapper uses memoization, so multiple accesses
-                // to self.sampleModule2 (with key "abc") return the same cached instance
                 for _ in 0..<10 {
-                    let _: SampleModuleType = self.sampleModule2
+                    let _: SampleModuleType = DependencyResolver.resolveFromSharedRoot(for: "abc")
                 }
                 expectation.fulfill()
             }
@@ -249,7 +246,7 @@ extension DependencyTests {
 
         let computationCount = ThreadSafeCounter()
 
-        let memoized = memoize { (value: Int) -> Int in
+        let memoized: @Sendable (Int) -> Int = memoize { @Sendable (value: Int) -> Int in
             computationCount.add(value)
             return value * 2
         }
@@ -270,6 +267,26 @@ extension DependencyTests {
 
         // Each value (0-4) should only be computed once, not 10*5=50 times
         XCTAssertLessThanOrEqual(computationCount.count(), 5, "Memoization should avoid redundant computation")
+    }
+
+    @MainActor
+    func testModuleFactoryCapturesMainActorInstance() {
+        MainActor.assertIsolated()
+
+        @MainActor
+        protocol MainActorCaptured: AnyObject { }
+
+        @MainActor
+        final class MainActorCapturedImpl: MainActorCaptured { }
+
+        let captured = MainActorCapturedImpl()
+        let resolver = DependencyResolver {
+            Module { captured as MainActorCaptured }
+        }
+        resolver.build()
+
+        let injected: MainActorCaptured = DependencyResolver.resolveFromSharedRoot()
+        XCTAssertTrue((injected as AnyObject) === (captured as AnyObject))
     }
 }
 

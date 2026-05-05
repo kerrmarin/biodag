@@ -1,5 +1,11 @@
 # Unreleased
 
+- Relax `Module` factory type to `@escaping () -> T` (no longer requires `@Sendable`), enabling registration that captures `@MainActor` or non-Sendable instances (for example app adapters).
+- Store module factories in an internal `@unchecked Sendable` box; document caller obligations in `THREAD_SAFETY.md`.
+- `Inject` is now `@unchecked Sendable`; `memoize` returns `(T) -> U` by default, with a `@Sendable` overload (marked `@_disfavoredOverload`) for use in `DispatchQueue.async` and similar APIs.
+- Add `DependencyResolver.resolveFromSharedRoot(for:)` for resolving via the shared root without `@Inject` property-wrapper storage.
+- Tests: resolve concurrently via `resolveFromSharedRoot`; add `testModuleFactoryCapturesMainActorInstance`.
+
 # 0.5.0
 - Update swift-tools-version to 6.2
 - Maintain Swift 6.0 language mode with strict concurrency checking

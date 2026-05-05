@@ -13,6 +13,14 @@ NSLock is used because:
 4. **Simple state** (two dictionaries) doesn't need actor's guarantees
 5. The lock protection is **explicit and verifiable**
 
+### Module factories (Swift 6 / strict concurrency)
+
+- A ``Module`` factory is stored in a type-erased box and may capture **non-`Sendable`** or **`@MainActor`** values (for example a shared UI adapter).
+- The factory runs **only while `DependencyResolver`’s lock is held** during resolution (the same as before).
+- **Callers are responsible** for ensuring the factory is safe to run from every thread that may call `resolve`, ``DependencyResolver/resolveFromSharedRoot(for:)``, or `Inject.wrappedValue`. If the factory touches main-actor-only APIs, restrict resolution to the main actor or perform your own hop inside the factory.
+- ``DependencyResolver/resolveFromSharedRoot(for:)`` matches `Inject`’s behavior but avoids capturing `self` in `@Sendable` contexts (for example concurrent tests on a background queue).
+- ``Inject`` is `@unchecked Sendable` because memoized resolution can produce values that are not `Sendable`, while the memoization cache remains protected by `NSLock` (see ``Memoize``).
+
 ---
 
 ## 1. Synchronous API Requirement
@@ -26,7 +34,7 @@ Biodag's core API relies on property wrappers, which cannot have async getters:
 ```swift
 @Inject private var service: MyService  // Clean, synchronous
 
-public struct Inject<Value>: Sendable {
+public struct Inject<Value>: @unchecked Sendable {
     public var wrappedValue: Value {
         return self.resolutionClosure(self.name)  // Immediate return
     }
@@ -52,7 +60,7 @@ class MyViewController: UIViewController {
 @Inject private var service: MyService
 
 // This won't compile:
-public struct Inject<Value>: Sendable {
+public struct Inject<Value>: @unchecked Sendable {
     public var wrappedValue: Value {
         return await self.resolve()  // ❌ Compile error: var can't be async
     }
