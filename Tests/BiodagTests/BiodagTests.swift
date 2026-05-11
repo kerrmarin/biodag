@@ -3,6 +3,7 @@ import Biodag
 
 //swiftlint:disable identifier_name force_cast
 
+@MainActor
 final class DependencyTests: XCTestCase {
 
     private static let dependencies = DependencyResolver {
@@ -25,10 +26,14 @@ final class DependencyTests: XCTestCase {
 
     override class func setUp() {
         super.setUp()
-        dependencies.build()
+        Task.immediate { @MainActor in
+            Self.dependencies.build()
+        }
+
     }
 }
 
+@MainActor
 final class DependencyScopeHelper {
     @Inject("abc") var sampleModule2: SampleModuleType
     @Inject("singleton") var singletonModule: SampleModuleType
@@ -156,6 +161,7 @@ extension DependencyTests {
         }
     }
 
+    @MainActor
     final class SampleModule: SampleModuleType {
         let value: String?
 
@@ -223,6 +229,7 @@ extension DependencyTests {
         }
     }
 
+    @MainActor
     class SomeViewController: ViewControllerObjectType {
         @Inject private var module: SampleModuleType
 
@@ -298,6 +305,7 @@ protocol WidgetModuleType {
     func test() -> String
 }
 
+@MainActor
 protocol SampleModuleType {
     func component() -> SomeObjectType
     func component() -> AnotherObjectType
@@ -319,6 +327,7 @@ protocol ViewModelObjectType {
     func testLmnNested() -> String
 }
 
+@MainActor
 protocol ViewControllerObjectType {
     func testRst() -> String
     func testRstNested() -> String
