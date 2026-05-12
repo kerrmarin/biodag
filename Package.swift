@@ -1,4 +1,4 @@
-// swift-tools-version:6.2
+// swift-tools-version:5.10
 // The swift-tools-version declares the minimum version of Swift required to build this package.
 
 import PackageDescription
@@ -16,18 +16,11 @@ let package = Package(
     ],
     targets: [
         .target(
-            name: "Biodag",
-            swiftSettings: [
-                .swiftLanguageMode(.v6)
-            ]
+            name: "Biodag"
         ),
         .testTarget(
             name: "BiodagTests",
-            dependencies: ["Biodag"],
-            swiftSettings: [
-                .swiftLanguageMode(.v6)
-            ]
+            dependencies: ["Biodag"]
         )
-    ],
-    swiftLanguageModes: [.v6]
+    ]
 )
