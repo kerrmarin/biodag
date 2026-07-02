@@ -6,6 +6,7 @@ import PackageDescription
 let package = Package(
     name: "Biodag",
     platforms: [
+        .macOS(.v26),
         .iOS(.v26)
     ],
     products: [

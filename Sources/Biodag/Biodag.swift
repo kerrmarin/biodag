@@ -91,6 +91,85 @@ private extension DependencyResolver {
 
         return component
     }
+
+    /// Resolves through inference and returns an instance of the given type from the current default container.
+    ///
+    /// If the dependency is not found, an exception will occur.
+    func resolveWithFallback<Preferred, Fallback>(for name: String? = nil) -> FallbackDependency<Preferred, Fallback> {
+        let preferredName = name ?? String(describing: Preferred.self)
+        let fallbackName = name ?? String(describing: Fallback.self)
+
+        // Preferred is optional, so it may not be there, but we should still check
+        let preferredModule = modules[preferredName]
+        let fallbackModule = preferredModule == nil ? modules[fallbackName] : nil
+
+        // First, make sure the module is available
+        if preferredModule == nil && fallbackModule == nil {
+            fatalError("Module for preferred '\(Preferred.self)' or fallback '\(Fallback.self)' not found!")
+        }
+
+        // Second, resolve the module as a dependency. If the module was registered as a
+        // prototype, return the resolved instance.
+        // If the module was registered as a singleton, return the cached instance if it exists,
+        // or the resolved one after storing it in the dependency resolver.
+        let component: FallbackDependency<Preferred, Fallback> = {
+            // Create a closure to lazily evaluate the resolution of the module
+            let resolvedModuleClosure: () -> Preferred? = {
+                return preferredModule?.resolve() as? Preferred
+            }
+
+            let fallbackModuleClosure: () -> Fallback = {
+                guard let mod = fallbackModule?.resolve() as? Fallback else {
+                    fatalError("Dependency '\(Fallback.self)' not resolved!")
+                }
+                return mod
+            }
+
+            return self.buildFallbackDependency(preferredModule: preferredModule, resolvedModuleClosure: resolvedModuleClosure, preferredName: preferredName,
+                                                fallbackModule: fallbackModule, fallbackModuleClosure: fallbackModuleClosure, fallbackName: fallbackName)
+
+        }()
+
+        return component
+    }
+
+    private func buildFallbackDependency<Preferred, Fallback>(preferredModule: Module?,
+                                                              resolvedModuleClosure: () -> Preferred?,
+                                                              preferredName: String,
+                                                              fallbackModule: Module?,
+                                                              fallbackModuleClosure: () -> Fallback,
+                                                              fallbackName: String) -> FallbackDependency<Preferred, Fallback> {
+
+        if let preferredModule {
+            switch preferredModule.scope {
+            case .prototype:
+                return .preferred(resolvedModuleClosure()!)
+            case .singleton:
+                if let instance = instances[preferredName] as? Preferred {
+                    return .preferred(instance)
+                }
+                let resolvedModule = resolvedModuleClosure()
+                instances[preferredName] = resolvedModule
+                return .preferred(resolvedModule!)
+            }
+        }
+
+        if let fallbackModule {
+            switch fallbackModule.scope {
+            case .prototype:
+                return .fallback(fallbackModuleClosure())
+            case .singleton:
+                if let instance = instances[preferredName] as? Fallback {
+                    return .fallback(instance)
+                }
+                let resolvedModule = fallbackModuleClosure()
+                instances[preferredName] = resolvedModule
+                return .fallback(resolvedModule)
+            }
+        }
+
+        fatalError("Preferred and fallback module not found")
+    }
 }
 
 // MARK: Public API
@@ -136,6 +215,32 @@ public struct Inject<Value> {
     public init(_ name: String) {
         self.name = name
     }
+}
+
+/// Resolves an instance from the dependency injection container.
+@propertyWrapper
+public struct InjectWithFallback<Preferred, Fallback> {
+    private let name: String?
+    private let resolutionClosure = memoize { name -> FallbackDependency<Preferred, Fallback> in
+        return DependencyResolver.root.resolveWithFallback(for: name)
+    }
+
+    public var wrappedValue: FallbackDependency<Preferred, Fallback> {
+        return self.resolutionClosure(self.name)
+    }
+
+    public init() {
+        self.name = nil
+    }
+
+    public init(_ name: String) {
+        self.name = name
+    }
+}
+
+public enum FallbackDependency<Preferred, Fallback> {
+    case preferred(Preferred)
+    case fallback(Fallback)
 }
 
 public enum InjectionScope {
