@@ -18,7 +18,6 @@ import Testing
 
         @InjectWithFallback var added: FallbackDependency<Preferred, Fallback>
 
-        #expect(added != nil)
         switch added {
             case .preferred:
             Issue.record("Preferred should not be selected")
@@ -39,7 +38,6 @@ import Testing
 
         @InjectWithFallback var added: FallbackDependency<Preferred1, Fallback1>
 
-        #expect(added != nil)
         switch added {
         case .preferred:
             break
@@ -60,7 +58,6 @@ import Testing
 
         @InjectWithFallback var added: FallbackDependency<Preferred2, Fallback2>
 
-        #expect(added != nil)
         switch added {
         case .preferred:
             break

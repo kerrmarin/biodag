@@ -40,13 +40,7 @@ If you forget to `build` the dependency container, it will result in a run-time 
 
 # Installation
 
-The easiest way to install this is via CocoaPods:
-
-```
-pod 'Biodag', '~> 0.3.0'
-```
-
-You can also use SPM. Add a dependency for Biodag like:
+The easiest way to install this is via SPM. Add a dependency for Biodag like:
 
 ```
 .package(url: "https://github.com/kerrmarin/biodag.git", from: "0.3.0")
